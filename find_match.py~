@@ -1,0 +1,71 @@
+import pdb
+import pickle
+import numpy as np
+import cv2
+import face_recognition
+
+with open('encodings_caras_famosas.pickle', 'rb') as enc_f:
+    encodings_caras_famosas = pickle.load(enc_f)
+
+with open('index_to_name.pickle', 'rb') as itn_f:
+    index_to_name = pickle.load(itn_f)
+
+cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+print(W, 'x', H)
+
+while True:
+    ret, frame = cap.read()
+
+    if not ret:
+        break
+
+    frame = frame[:, W//4: -W//4, :]
+
+    face_locations = face_recognition.face_locations(frame)
+
+    if face_locations:
+        face_location = face_locations[0]
+        top, right, bottom, left = face_location
+
+        face_encoding = face_recognition.face_encodings(frame,
+                                                        [face_location])[0]
+
+        cv2.rectangle(frame, (left, top), (right, bottom), (200, 0, 0), 2)
+        face_frame = frame.copy()
+
+    black = np.zeros((H, W//2, 3), np.uint8)
+    cv2.putText(black, 'Pulsa espacio', (10, 350),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.6, (255, 255, 255), 1)
+    cv2.putText(black, 'para continuar', (10, 410),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.6, (255, 255, 255), 1)
+    
+    total_frame = np.hstack((frame, black))
+    cv2.imshow('¿A qué famoso te pareces?', total_frame)
+
+    key = cv2.waitKey(30) & 0xFF
+    if key == ord(' '):
+        break
+
+cv2.destroyWindow('¿A qué famoso te pareces?')
+
+distances = face_recognition.face_distance(encodings_caras_famosas,
+                                           face_encoding)
+
+index = distances.argmin()
+
+name = index_to_name[index]
+
+match = cv2.imread('caras_famosas/preprocessed/' + str(index) + '.jpg')
+
+result_frame = np.hstack((face_frame, match))
+
+cv2.imshow(name, result_frame)
+
+cv2.waitKey(8000) & 0xFF
+
+cv2.destroyAllWindows()
